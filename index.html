@@ -80,6 +80,65 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 詳細可視化セクション -->
+                    <div class="visualization-section">
+                        <!-- 部署別進捗状況テーブル -->
+                        <div class="data-visualization">
+                            <h4><i class="fas fa-table"></i> 部署別進捗状況</h4>
+                            <div class="table-container">
+                                <table id="departmentProgressTable1" class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>部署</th>
+                                            <th>リリース済み</th>
+                                            <th>リリース準備中</th>
+                                            <th>開発中</th>
+                                            <th>開発対象</th>
+                                            <th>検討</th>
+                                            <th>中断</th>
+                                            <th>保留</th>
+                                            <th>開発検討</th>
+                                            <th>総計</th>
+                                            <th>完了率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 進捗カテゴリ統計 -->
+                        <div class="data-visualization">
+                            <h4><i class="fas fa-chart-pie"></i> 進捗カテゴリ別統計</h4>
+                            <div id="progressCategoryStats1" class="stats-grid"></div>
+                        </div>
+
+                        <!-- 処理済みデータプレビュー -->
+                        <div class="data-visualization">
+                            <h4><i class="fas fa-list"></i> 処理済みデータプレビュー</h4>
+                            <div class="data-controls">
+                                <input type="text" id="dataFilter1" placeholder="データを検索..." class="filter-input">
+                                <select id="categoryFilter1" class="filter-select">
+                                    <option value="">すべてのカテゴリ</option>
+                                </select>
+                            </div>
+                            <div class="table-container">
+                                <table id="processedDataTable1" class="data-table">
+                                    <thead></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            <div class="table-pagination">
+                                <span id="dataCount1">データ件数: 0</span>
+                                <div class="pagination-controls">
+                                    <button id="prevPage1" onclick="changePage(1, -1)">前へ</button>
+                                    <span id="pageInfo1">1 / 1</span>
+                                    <button id="nextPage1" onclick="changePage(1, 1)">次へ</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- エクスポートボタン -->
                     <div class="export-section">
@@ -139,10 +198,48 @@
                         </div>
                     </div>
 
-                    <!-- 進捗分類結果 -->
-                    <div class="classification-result">
-                        <h4>進捗状況分類結果</h4>
-                        <div id="classificationSummary2"></div>
+                    <!-- 詳細可視化セクション -->
+                    <div class="visualization-section">
+                        <!-- 進捗分類結果 -->
+                        <div class="data-visualization">
+                            <h4><i class="fas fa-chart-bar"></i> 進捗状況分類結果</h4>
+                            <div id="classificationSummary2" class="classification-summary"></div>
+                            <div id="classificationChart2" class="classification-chart"></div>
+                        </div>
+
+                        <!-- タスクデータテーブル -->
+                        <div class="data-visualization">
+                            <h4><i class="fas fa-table"></i> 処理済みタスクデータ</h4>
+                            <div class="data-controls">
+                                <input type="text" id="taskFilter2" placeholder="タスクを検索..." class="filter-input">
+                                <select id="taskStatusFilter2" class="filter-select">
+                                    <option value="">すべての進捗状況</option>
+                                </select>
+                                <select id="taskCategoryFilter2" class="filter-select">
+                                    <option value="">すべての部署</option>
+                                </select>
+                            </div>
+                            <div class="table-container">
+                                <table id="taskDataTable2" class="data-table">
+                                    <thead></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            <div class="table-pagination">
+                                <span id="taskCount2">タスク件数: 0</span>
+                                <div class="pagination-controls">
+                                    <button id="prevTaskPage2" onclick="changePage(2, -1)">前へ</button>
+                                    <span id="taskPageInfo2">1 / 1</span>
+                                    <button id="nextTaskPage2" onclick="changePage(2, 1)">次へ</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 統計情報 -->
+                        <div class="data-visualization">
+                            <h4><i class="fas fa-chart-pie"></i> タスク統計情報</h4>
+                            <div id="taskStats2" class="stats-grid"></div>
+                        </div>
                     </div>
                     
                     <!-- エクスポートボタン -->
