@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タスクレポート自動化システム - 統合版</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs/dist/pptxgen.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1><i class="fas fa-chart-line"></i> タスクレポート自動化システム - 統合版</h1>
+            <p>部署別進捗分析、タスク管理、インターン生管理を統合したオールインワンソリューション</p>
+            <p style="font-size: 0.85rem; color: #888; margin-top: 5px;">
+                <i class="fas fa-info-circle"></i> サーバー不要で動作します。すべての機能をブラウザ内で完結して利用できます。
+            </p>
+        </header>
+
+        <!-- タブナビゲーション -->
+        <nav class="tab-navigation">
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="progress-analysis">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>部署別進捗分析</span>
+                </button>
+                <button class="tab-btn" data-tab="task-management">
+                    <i class="fas fa-tasks"></i>
+                    <span>タスク管理</span>
+                </button>
+                <button class="tab-btn" data-tab="intern-management">
+                    <i class="fas fa-users"></i>
+                    <span>インターン生管理</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- タブコンテンツ -->
+        <main class="main-content">
+            <!-- 部署別進捗分析タブ -->
+            <div class="tab-content active" id="progress-analysis">
+                <div class="tab-description">
+                    <h2><i class="fas fa-chart-bar"></i> 部署別進捗状況分析</h2>
+                    <p>CSVファイルをアップロードして、部署別の進捗状況をCSVおよびPowerPoint形式でエクスポートします。</p>
+                </div>
+
+                <!-- ファイルアップロードセクション -->
+                <section class="upload-section">
+                    <div class="upload-area" id="uploadArea1">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>CSVファイルをアップロード</h3>
+                        <p>ドラッグ&ドロップまたはクリックしてファイルを選択</p>
+                        <input type="file" id="fileInput1" accept=".csv" style="display: none;">
+                        <button class="upload-btn" id="uploadBtn1">
+                            <i class="fas fa-folder-open"></i> ファイルを選択
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 処理結果セクション -->
+                <section class="result-section" id="resultSection1" style="display: none;">
+                    <div class="result-header">
+                        <h3><i class="fas fa-chart-bar"></i> 処理結果</h3>
+                        <div class="result-summary">
+                            <div class="summary-item">
+                                <span class="label">処理部署数:</span>
+                                <span id="processedDepartments1">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">総タスク数:</span>
+                                <span id="totalTasks1">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">完了率:</span>
+                                <span id="completionRate1">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- エクスポートボタン -->
+                    <div class="export-section">
+                        <button class="export-btn" id="downloadProgressCSV1" onclick="downloadProgressCSV()" disabled>
+                            <i class="fas fa-file-csv"></i> 部署別進捗状況CSVをダウンロード
+                        </button>
+                        <button class="export-btn" id="downloadProcessedDataCSV1" onclick="downloadProcessedDataCSV()" disabled>
+                            <i class="fas fa-file-csv"></i> 処理済みデータCSVをダウンロード
+                        </button>
+                        <button class="export-btn deploy-date-btn" id="downloadSortedByDeployDate1" onclick="downloadSortedByDeployDate()" disabled>
+                            <i class="fas fa-calendar-alt"></i> デプロイ日順ソートCSVをダウンロード
+                        </button>
+                        <button class="export-btn powerpoint-btn" id="downloadPowerPoint1" onclick="downloadPowerPoint()" disabled>
+                            <i class="fas fa-file-powerpoint"></i> PowerPointレポートをダウンロード
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- タスク管理タブ -->
+            <div class="tab-content" id="task-management">
+                <div class="tab-description">
+                    <h2><i class="fas fa-tasks"></i> タスク管理システム</h2>
+                    <p>タスクデータCSVを読み込み、進捗状況を自動分類してPowerPointレポートを生成します。</p>
+                </div>
+
+                <!-- ファイルアップロードセクション -->
+                <section class="upload-section">
+                    <div class="upload-area" id="uploadArea2">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>タスクデータCSVをアップロード</h3>
+                        <p>タスク依頼データのCSVファイルを選択してください</p>
+                        <input type="file" id="fileInput2" accept=".csv" style="display: none;">
+                        <button class="upload-btn" id="uploadBtn2">
+                            <i class="fas fa-folder-open"></i> ファイルを選択
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 処理結果セクション -->
+                <section class="result-section" id="resultSection2" style="display: none;">
+                    <div class="result-header">
+                        <h3><i class="fas fa-tasks"></i> タスク処理結果</h3>
+                        <div class="result-summary">
+                            <div class="summary-item">
+                                <span class="label">総タスク数:</span>
+                                <span id="totalTasks2">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">処理済みタスク数:</span>
+                                <span id="processedTasks2">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">除外タスク数:</span>
+                                <span id="excludedTasks2">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 進捗分類結果 -->
+                    <div class="classification-result">
+                        <h4>進捗状況分類結果</h4>
+                        <div id="classificationSummary2"></div>
+                    </div>
+                    
+                    <!-- エクスポートボタン -->
+                    <div class="export-section">
+                        <button class="export-btn" id="downloadTaskCSV2" onclick="downloadTaskCSV()" disabled>
+                            <i class="fas fa-file-csv"></i> 処理済みタスクCSVをダウンロード
+                        </button>
+                        <button class="export-btn powerpoint-btn" id="downloadTaskPowerPoint2" onclick="downloadTaskPowerPoint()" disabled>
+                            <i class="fas fa-file-powerpoint"></i> タスクレポートPowerPointをダウンロード
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- インターン生管理タブ -->
+            <div class="tab-content" id="intern-management">
+                <div class="tab-description">
+                    <h2><i class="fas fa-users"></i> インターン生管理システム</h2>
+                    <p>インターン生データ（Excel/CSV）を読み込み、メンバー紹介のPowerPointスライドを自動生成します。</p>
+                </div>
+
+                <!-- ファイルアップロードセクション -->
+                <section class="upload-section">
+                    <div class="upload-area" id="uploadArea3">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>インターン生データをアップロード</h3>
+                        <p>Excel（.xlsx）またはCSVファイルを選択してください</p>
+                        <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">
+                            <i class="fas fa-info-circle"></i> データ形式: 画像ファイル名, 氏名, ふりがな, 年齢, 所属, 入社月, 紹介文
+                        </p>
+                        <input type="file" id="fileInput3" accept=".xlsx,.csv" style="display: none;">
+                        <button class="upload-btn" id="uploadBtn3">
+                            <i class="fas fa-folder-open"></i> ファイルを選択
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 処理結果セクション -->
+                <section class="result-section" id="resultSection3" style="display: none;">
+                    <div class="result-header">
+                        <h3><i class="fas fa-users"></i> インターン生データ処理結果</h3>
+                        <div class="result-summary">
+                            <div class="summary-item">
+                                <span class="label">メンバー数:</span>
+                                <span id="totalMembers3">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">生成スライド数:</span>
+                                <span id="totalSlides3">0</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">1スライドあたり:</span>
+                                <span>最大6人</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- メンバー一覧プレビュー -->
+                    <div class="member-preview">
+                        <h4>メンバー一覧プレビュー</h4>
+                        <div id="memberPreviewList3"></div>
+                    </div>
+                    
+                    <!-- エクスポートボタン -->
+                    <div class="export-section">
+                        <button class="export-btn powerpoint-btn" id="downloadInternPowerPoint3" onclick="downloadInternPowerPoint()" disabled>
+                            <i class="fas fa-file-powerpoint"></i> インターン生スライドをダウンロード
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- ローディングオーバーレイ -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>データを処理中...</p>
+            </div>
+        </div>
+
+        <!-- エラーモーダル -->
+        <div class="modal" id="errorModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-exclamation-triangle"></i> エラー</h3>
+                    <button class="close-btn" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="errorMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" onclick="closeModal()">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
