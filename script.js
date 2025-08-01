@@ -681,11 +681,427 @@ function displayProgressAnalysisResults() {
     console.log('部署別進捗分析結果表示を開始');
     
     updateProgressAnalysisSummary();
+    displayDepartmentProgressTable();
+    displayProgressCategoryStats();
+    displayProcessedDataTable();
     
     const resultSection = document.getElementById('resultSection1');
     if (resultSection) {
         resultSection.style.display = 'block';
     }
+}
+
+// 部署別進捗状況テーブルの表示
+function displayDepartmentProgressTable() {
+    const table = document.getElementById('departmentProgressTable1');
+    if (!table || !clientAnalysisData) return;
+    
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    
+    // 部署別データを追加
+    Object.entries(clientAnalysisData.department_metrics).forEach(([dept, metrics]) => {
+        const row = document.createElement('tr');
+        const completionRate = metrics.completion_rate.toFixed(1);
+        const total = metrics.development_total + metrics.consideration_total;
+        
+        row.innerHTML = `
+            <td><strong>${dept}</strong></td>
+            <td>${metrics.released}</td>
+            <td>${metrics.release_ready}</td>
+            <td>${metrics.in_development}</td>
+            <td><strong>${metrics.development_total}</strong></td>
+            <td>${metrics.under_consideration}</td>
+            <td>${metrics.suspended}</td>
+            <td>${metrics.on_hold}</td>
+            <td><strong>${metrics.consideration_total}</strong></td>
+            <td><strong>${total}</strong></td>
+            <td><strong>${completionRate}%</strong></td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // 総計行を追加
+    const totalMetrics = calculateTotalMetrics();
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'total-row';
+    const grandTotal = totalMetrics.development_total + totalMetrics.consideration_total;
+    
+    totalRow.innerHTML = `
+        <td><strong>総計</strong></td>
+        <td><strong>${totalMetrics.released}</strong></td>
+        <td><strong>${totalMetrics.release_ready}</strong></td>
+        <td><strong>${totalMetrics.in_development}</strong></td>
+        <td><strong>${totalMetrics.development_total}</strong></td>
+        <td><strong>${totalMetrics.under_consideration}</strong></td>
+        <td><strong>${totalMetrics.suspended}</strong></td>
+        <td><strong>${totalMetrics.on_hold}</strong></td>
+        <td><strong>${totalMetrics.consideration_total}</strong></td>
+        <td><strong>${grandTotal}</strong></td>
+        <td><strong>${totalMetrics.completion_rate}%</strong></td>
+    `;
+    tbody.appendChild(totalRow);
+}
+
+// 進捗カテゴリ統計の表示
+function displayProgressCategoryStats() {
+    const container = document.getElementById('progressCategoryStats1');
+    if (!container || !clientAnalysisData) return;
+    
+    const totalMetrics = calculateTotalMetrics();
+    const statsData = [
+        { label: 'リリース済み', value: totalMetrics.released, class: 'stat-released' },
+        { label: 'リリース準備中', value: totalMetrics.release_ready, class: 'stat-ready' },
+        { label: '開発中', value: totalMetrics.in_development, class: 'stat-development' },
+        { label: '検討', value: totalMetrics.under_consideration, class: 'stat-consideration' },
+        { label: '中断', value: totalMetrics.suspended, class: 'stat-suspended' },
+        { label: '保留', value: totalMetrics.on_hold, class: 'stat-hold' }
+    ];
+    
+    container.innerHTML = statsData.map(stat => `
+        <div class="stat-card ${stat.class}">
+            <div class="stat-value">${stat.value}</div>
+            <div class="stat-label">${stat.label}</div>
+        </div>
+    `).join('');
+}
+
+// ページネーション関連変数
+let currentPage1 = 1;
+let currentPage2 = 1;
+const itemsPerPage = 20;
+let filteredData1 = [];
+let filteredData2 = [];
+
+// 処理済みデータテーブルの表示
+function displayProcessedDataTable() {
+    if (!processedData.length) return;
+    
+    // フィルター選択肢を設定
+    setupFilters1();
+    
+    // 初期データ表示
+    filteredData1 = processedData.filter(row => row['進捗カテゴリ'] !== '除外対象');
+    currentPage1 = 1;
+    renderDataTable1();
+    
+    // フィルターイベントリスナー
+    document.getElementById('dataFilter1').addEventListener('input', applyFilters1);
+    document.getElementById('categoryFilter1').addEventListener('change', applyFilters1);
+}
+
+// フィルター設定
+function setupFilters1() {
+    const categoryFilter = document.getElementById('categoryFilter1');
+    const categories = [...new Set(processedData.map(row => row['進捗カテゴリ']).filter(Boolean))];
+    
+    categoryFilter.innerHTML = '<option value="">すべてのカテゴリ</option>';
+    categories.forEach(category => {
+        if (category !== '除外対象') {
+            categoryFilter.innerHTML += `<option value="${category}">${category}</option>`;
+        }
+    });
+}
+
+// フィルター適用
+function applyFilters1() {
+    const searchText = document.getElementById('dataFilter1').value.toLowerCase();
+    const selectedCategory = document.getElementById('categoryFilter1').value;
+    
+    filteredData1 = processedData.filter(row => {
+        if (row['進捗カテゴリ'] === '除外対象') return false;
+        
+        // テキスト検索
+        const searchMatch = !searchText || Object.values(row).some(value => 
+            String(value).toLowerCase().includes(searchText)
+        );
+        
+        // カテゴリフィルター
+        const categoryMatch = !selectedCategory || row['進捗カテゴリ'] === selectedCategory;
+        
+        return searchMatch && categoryMatch;
+    });
+    
+    currentPage1 = 1;
+    renderDataTable1();
+}
+
+// データテーブル描画
+function renderDataTable1() {
+    const table = document.getElementById('processedDataTable1');
+    if (!table) return;
+    
+    const startIndex = (currentPage1 - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = filteredData1.slice(startIndex, endIndex);
+    
+    // ヘッダー設定
+    if (pageData.length > 0) {
+        const headers = Object.keys(pageData[0]);
+        table.querySelector('thead').innerHTML = `
+            <tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr>
+        `;
+        
+        // データ行設定
+        const tbody = table.querySelector('tbody');
+        tbody.innerHTML = pageData.map(row => `
+            <tr>${headers.map(header => {
+                let cellValue = row[header] || '';
+                
+                // 金額項目の表示形式調整
+                if (header === 'インターン費用' || header === '外注時費用' || header === '収益貢献（年）') {
+                    const numValue = parseFloat(cellValue);
+                    if (numValue > 0) {
+                        cellValue = `${numValue.toLocaleString()}円`;
+                    } else {
+                        cellValue = '0円';
+                    }
+                }
+                // 進捗状況にバッジを適用
+                else if (header === '進捗状況') {
+                    cellValue = `<span class="status-badge status-${cellValue.replace(/\s+/g, '-')}">${cellValue}</span>`;
+                }
+                return `<td>${cellValue}</td>`;
+            }).join('')}</tr>
+        `).join('');
+    }
+    
+    // ページネーション更新
+    updatePagination1();
+}
+
+// ページネーション更新
+function updatePagination1() {
+    const totalPages = Math.ceil(filteredData1.length / itemsPerPage);
+    
+    document.getElementById('dataCount1').textContent = `データ件数: ${filteredData1.length}`;
+    document.getElementById('pageInfo1').textContent = `${currentPage1} / ${totalPages}`;
+    
+    document.getElementById('prevPage1').disabled = currentPage1 <= 1;
+    document.getElementById('nextPage1').disabled = currentPage1 >= totalPages;
+}
+
+// ページ変更
+function changePage(tabId, direction) {
+    if (tabId === 1) {
+        const totalPages = Math.ceil(filteredData1.length / itemsPerPage);
+        currentPage1 = Math.max(1, Math.min(totalPages, currentPage1 + direction));
+        renderDataTable1();
+    } else if (tabId === 2) {
+        const totalPages = Math.ceil(filteredData2.length / itemsPerPage);
+        currentPage2 = Math.max(1, Math.min(totalPages, currentPage2 + direction));
+        renderTaskDataTable2();
+    }
+}
+
+// タスク管理の結果表示
+function displayTaskManagementResults() {
+    console.log('タスク管理結果表示を開始');
+    
+    updateTaskManagementSummary();
+    displayTaskClassificationChart();
+    displayTaskDataTable();
+    displayTaskStats();
+    
+    const resultSection = document.getElementById('resultSection2');
+    if (resultSection) {
+        resultSection.style.display = 'block';
+    }
+}
+
+// タスク分類結果をチャート表示
+function displayTaskClassificationChart() {
+    const summaryContainer = document.getElementById('classificationSummary2');
+    const chartContainer = document.getElementById('classificationChart2');
+    
+    if (!summaryContainer || !chartContainer || !taskClassificationData) return;
+    
+    // サマリーカード表示
+    const summaryHtml = Object.entries(taskClassificationData).map(([status, count]) => `
+        <div class="classification-item">
+            <span class="label">${status}</span>
+            <span class="value">${count}</span>
+        </div>
+    `).join('');
+    summaryContainer.innerHTML = summaryHtml;
+    
+    // バーチャート表示
+    const totalTasks = Object.values(taskClassificationData).reduce((sum, count) => sum + count, 0);
+    const chartHtml = Object.entries(taskClassificationData).map(([status, count]) => {
+        const percentage = totalTasks > 0 ? (count / totalTasks * 100) : 0;
+        return `
+            <div class="chart-bar">
+                <div class="chart-bar-label">${status}</div>
+                <div class="chart-bar-visual">
+                    <div class="chart-bar-fill" style="width: ${percentage}%"></div>
+                </div>
+                <div class="chart-bar-value">${count}件</div>
+            </div>
+        `;
+    }).join('');
+    chartContainer.innerHTML = chartHtml;
+}
+
+// タスクデータテーブルの表示
+function displayTaskDataTable() {
+    if (!taskProcessedData.length) return;
+    
+    // フィルター設定
+    setupTaskFilters2();
+    
+    // 初期データ表示
+    filteredData2 = [...taskProcessedData];
+    currentPage2 = 1;
+    renderTaskDataTable2();
+    
+    // フィルターイベントリスナー
+    const taskFilter = document.getElementById('taskFilter2');
+    const statusFilter = document.getElementById('taskStatusFilter2');
+    const categoryFilter = document.getElementById('taskCategoryFilter2');
+    
+    if (taskFilter) taskFilter.addEventListener('input', applyTaskFilters2);
+    if (statusFilter) statusFilter.addEventListener('change', applyTaskFilters2);
+    if (categoryFilter) categoryFilter.addEventListener('change', applyTaskFilters2);
+}
+
+// タスクフィルター設定
+function setupTaskFilters2() {
+    const statusFilter = document.getElementById('taskStatusFilter2');
+    const categoryFilter = document.getElementById('taskCategoryFilter2');
+    
+    if (statusFilter) {
+        // 進捗状況フィルター（分類後の進捗状況を使用）
+        const statuses = [...new Set(taskProcessedData.map(row => row['進捗状況']).filter(Boolean))];
+        statusFilter.innerHTML = '<option value="">すべての進捗状況</option>';
+        statuses.forEach(status => {
+            statusFilter.innerHTML += `<option value="${status}">${status}</option>`;
+        });
+    }
+    
+    if (categoryFilter) {
+        // 部署フィルター
+        const departments = [...new Set(taskProcessedData.map(row => row['依頼部署']).filter(Boolean))];
+        categoryFilter.innerHTML = '<option value="">すべての部署</option>';
+        departments.forEach(dept => {
+            categoryFilter.innerHTML += `<option value="${dept}">${dept}</option>`;
+        });
+        // カテゴリフィルターのラベルも変更
+        const categoryLabel = document.querySelector('label[for="taskCategoryFilter2"]');
+        if (categoryLabel) {
+            categoryLabel.textContent = '部署フィルター:';
+        }
+    }
+}
+
+// タスクフィルター適用
+function applyTaskFilters2() {
+    const taskFilter = document.getElementById('taskFilter2');
+    const statusFilter = document.getElementById('taskStatusFilter2');
+    const categoryFilter = document.getElementById('taskCategoryFilter2');
+    
+    const searchText = taskFilter ? taskFilter.value.toLowerCase() : '';
+    const selectedStatus = statusFilter ? statusFilter.value : '';
+    const selectedDepartment = categoryFilter ? categoryFilter.value : '';
+    
+    filteredData2 = taskProcessedData.filter(row => {
+        const searchMatch = !searchText || Object.values(row).some(value => 
+            String(value).toLowerCase().includes(searchText)
+        );
+        const statusMatch = !selectedStatus || row['進捗状況'] === selectedStatus;
+        const departmentMatch = !selectedDepartment || row['依頼部署'] === selectedDepartment;
+        
+        return searchMatch && statusMatch && departmentMatch;
+    });
+    
+    currentPage2 = 1;
+    renderTaskDataTable2();
+}
+
+// タスクテーブル描画
+function renderTaskDataTable2() {
+    const table = document.getElementById('taskDataTable2');
+    if (!table) return;
+    
+    const startIndex = (currentPage2 - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageData = filteredData2.slice(startIndex, endIndex);
+    
+    if (pageData.length > 0) {
+        const headers = Object.keys(pageData[0]);
+        table.querySelector('thead').innerHTML = `
+            <tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr>
+        `;
+        
+        const tbody = table.querySelector('tbody');
+        tbody.innerHTML = pageData.map(row => `
+            <tr>${headers.map(header => {
+                let cellValue = row[header] || '';
+                
+                // 金額項目の表示形式調整
+                if (header === 'インターン費用' || header === '外注時費用' || header === '収益貢献（年）') {
+                    const numValue = parseFloat(cellValue);
+                    if (numValue > 0) {
+                        cellValue = `${numValue.toLocaleString()}円`;
+                    } else {
+                        cellValue = '0円';
+                    }
+                }
+                // 進捗状況にバッジを適用
+                else if (header === '進捗状況') {
+                    cellValue = `<span class="status-badge status-${cellValue.replace(/\s+/g, '-')}">${cellValue}</span>`;
+                }
+                return `<td>${cellValue}</td>`;
+            }).join('')}</tr>
+        `).join('');
+    }
+    
+    updateTaskPagination2();
+}
+
+// タスクページネーション更新
+function updateTaskPagination2() {
+    const totalPages = Math.ceil(filteredData2.length / itemsPerPage);
+    
+    const taskCount = document.getElementById('taskCount2');
+    const pageInfo = document.getElementById('taskPageInfo2');
+    const prevBtn = document.getElementById('prevTaskPage2');
+    const nextBtn = document.getElementById('nextTaskPage2');
+    
+    if (taskCount) taskCount.textContent = `タスク件数: ${filteredData2.length}`;
+    if (pageInfo) pageInfo.textContent = `${currentPage2} / ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = currentPage2 <= 1;
+    if (nextBtn) nextBtn.disabled = currentPage2 >= totalPages;
+}
+
+// タスク統計情報の表示
+function displayTaskStats() {
+    const container = document.getElementById('taskStats2');
+    if (!container || !taskClassificationData) return;
+    
+    const totalProcessed = taskProcessedData.length;
+    const totalRaw = taskRawData.length;
+    const excludedCount = totalRaw - totalProcessed;
+    
+    // 新しい統計情報を計算
+    const statistics = calculateTaskStatistics(taskProcessedData);
+    
+    const statsData = [
+        { label: '総タスク数', value: totalRaw, class: 'stat-total' },
+        { label: '処理済み', value: totalProcessed, class: 'stat-processed' },
+        { label: '除外タスク', value: excludedCount, class: 'stat-excluded' },
+        { label: '処理率', value: `${((totalProcessed / totalRaw) * 100).toFixed(1)}%`, class: 'stat-rate' },
+        { label: 'インターン費用', value: `${(statistics.totalInternCost / 10000).toFixed(0)}万円`, class: 'stat-intern-cost' },
+        { label: '外注費用', value: `${(statistics.totalOutsourcingCost / 10000).toFixed(0)}万円`, class: 'stat-outsourcing-cost' },
+        { label: '年間収益貢献', value: `${(statistics.totalAnnualRevenue / 10000).toFixed(0)}万円`, class: 'stat-revenue' },
+        { label: '費用対効果', value: `${statistics.costEffectiveness.toFixed(1)}倍`, class: 'stat-efficiency' }
+    ];
+    
+    container.innerHTML = statsData.map(stat => `
+        <div class="stat-card ${stat.class}">
+            <div class="stat-value">${stat.value}</div>
+            <div class="stat-label">${stat.label}</div>
+        </div>
+    `).join('');
 }
 
 // サマリー情報の更新
@@ -713,127 +1129,195 @@ function updateProgressAnalysisSummary() {
 
 // タスク管理のデータ処理
 function processTaskData() {
-    console.log('タスク管理データ処理を開始');
+    console.log('=== タスク管理データ処理開始 ===');
+    console.log(`元データ件数: ${taskRawData.length} 件`);
     
+    if (taskRawData.length === 0) {
+        console.error('データが空です');
+        return;
+    }
+    
+    const firstRow = taskRawData[0];
+    console.log(`列数: ${Object.keys(firstRow).length} 列`);
+    console.log('利用可能な列名:', Object.keys(firstRow));
+    
+    // 進捗状況の分類定義（dev_list.jsと同じ）
     const progressMapping = {
         'リリース済み': ['公開済み（アップデート予定）', '完了'],
         'リリース準備': ['公開可能（川島さん確認待ち）', 'FB待ち'],
         '開発中': ['推奨（宮川案）', '設計', '実装']
     };
     
+    // 削除対象の進捗状況
     const deleteStatus = ['未着手', '未確認', '検討', '保留', '中断'];
     
+    // 削除対象の行を除外
     const filteredResults = taskRawData.filter(row => 
         !deleteStatus.includes(row['進捗状況'])
     );
     
-    console.log(`タスクフィルタリング後: ${filteredResults.length} 件（元データ: ${taskRawData.length} 件）`);
+    console.log(`\n=== フィルタリング後 ===`);
+    console.log(`処理対象件数: ${filteredResults.length} 件（削除: ${taskRawData.length - filteredResults.length} 件）`);
     
+    // 進捗状況を分類する関数
     function classifyProgress(status) {
         for (const [category, values] of Object.entries(progressMapping)) {
+            // 部分一致で判定（カンマ区切りの場合も対応）
             for (const value of values) {
                 if (String(status).includes(value)) {
                     return category;
                 }
             }
         }
-        return '開発中';
+        return '開発中'; // デフォルト
     }
     
+    // 進捗状況を分類して新しい列を作成
     filteredResults.forEach(row => {
         row['進捗状況_分類'] = classifyProgress(row['進捗状況']);
     });
     
+    // 分類結果の確認
+    console.log("\n=== 進捗状況分類結果 ===");
     taskClassificationData = {};
     filteredResults.forEach(row => {
         const status = row['進捗状況_分類'];
         taskClassificationData[status] = (taskClassificationData[status] || 0) + 1;
     });
+    console.log(taskClassificationData);
     
-    taskProcessedData = filteredResults;
+    // 項番の列名を探す
+    const availableColumns = Object.keys(firstRow);
+    const noColumn = availableColumns.find(col => 
+        col.includes('No') || col.includes('項番') || col.includes('番号')
+    );
+    console.log("項番の列名:", noColumn || '見つかりません');
     
-    console.log('タスク管理データ処理完了:', taskProcessedData.length, '件処理済み');
-}
-
-// タスク管理の結果表示
-function displayTaskManagementResults() {
-    console.log('タスク管理結果表示を開始');
+    // 列名マッピング（dev_list.jsと同じ）
+    const columnMapping = {
+        '項番': noColumn || 'No',
+        '依頼部署': '部署',
+        '開発分類': '開発分類',
+        'タスク内容': 'タスク内容',
+        '進捗状況': '進捗状況_分類', // 分類後の進捗状況を使用
+        '外注時費用': 'アウトソーシング費用'
+    };
     
-    updateTaskManagementSummary();
-    displayTaskClassificationResults();
+    // 新しいデータ配列を作成
+    const newData = [];
     
-    const resultSection = document.getElementById('resultSection2');
-    if (resultSection) {
-        resultSection.style.display = 'block';
-    }
-}
-
-// タスク管理のサマリー更新
-function updateTaskManagementSummary() {
-    const totalTasksElement = document.getElementById('totalTasks2');
-    const processedTasksElement = document.getElementById('processedTasks2');
-    const excludedTasksElement = document.getElementById('excludedTasks2');
-    
-    const totalTasks = taskRawData.length;
-    const processedTasks = taskProcessedData.length;
-    const excludedTasks = totalTasks - processedTasks;
-    
-    if (totalTasksElement) {
-        totalTasksElement.textContent = totalTasks;
-    }
-    if (processedTasksElement) {
-        processedTasksElement.textContent = processedTasks;
-    }
-    if (excludedTasksElement) {
-        excludedTasksElement.textContent = excludedTasks;
-    }
-}
-
-// タスク分類結果の表示
-function displayTaskClassificationResults() {
-    const classificationSummary = document.getElementById('classificationSummary2');
-    if (!classificationSummary) return;
-    
-    const summaryHtml = Object.entries(taskClassificationData).map(([status, count]) => {
-        return `
-            <div class="classification-item">
-                <span class="label">${status}</span>
-                <span class="value">${count}件</span>
-            </div>
-        `;
-    }).join('');
-    
-    classificationSummary.innerHTML = `<div class="classification-summary">${summaryHtml}</div>`;
-}
-
-// インターン生データの処理
-function processInternData(data) {
-    console.log('インターン生データ処理を開始');
-    
-    internMembersData = [];
-    for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        
-        if (row && row.length >= 6) {
-            const startMonthNum = parseInt(row[5]) || 6;
-            const startMonth = `${startMonthNum}月入社`;
-            
-            const member = {
-                id: i,
-                name: row[1] || '',
-                furigana: row[2] || '',
-                age: parseInt(row[3]) || 0,
-                affiliation: row[4] || '',
-                startMonth: startMonth,
-                description: row[6] || '',
-                imagePath: row[0] ? `./sample/images/${row[0]}` : `./images/intern${i}.jpg`,
-                highlight: null
-            };
-            internMembersData.push(member);
+    // 対応する列を抽出
+    filteredResults.forEach(row => {
+        const newRow = {};
+        for (const [newCol, originalCol] of Object.entries(columnMapping)) {
+            if (originalCol && row.hasOwnProperty(originalCol)) {
+                newRow[newCol] = row[originalCol];
+            } else {
+                // 対応する列がない場合は空の列を作成
+                newRow[newCol] = '';
+            }
         }
+        newData.push(newRow);
+    });
+    
+    // インターン費用を開発工数(h)×2000で算出
+    let internCosts = [];
+    if (firstRow.hasOwnProperty('開発工数(h)')) {
+        internCosts = filteredResults.map(row => {
+            const devHours = parseFloat(row['開発工数(h)']) || 0;
+            return devHours * 2000;
+        });
+        console.log('インターン費用を算出しました（開発工数×2000）');
+    } else {
+        internCosts = new Array(filteredResults.length).fill(0);
+        console.log('開発工数(h)列が見つからないため、インターン費用は0に設定');
     }
     
-    console.log(`${internMembersData.length}人のメンバーデータを読み込みました。`);
+    // 外注時費用を数値に変換
+    let outsourcingCosts = [];
+    if (newData[0] && newData[0].hasOwnProperty('外注時費用')) {
+        outsourcingCosts = newData.map(row => {
+            return parseFloat(row['外注時費用']) || 0;
+        });
+        console.log('外注時費用を数値変換しました');
+    } else {
+        outsourcingCosts = new Array(filteredResults.length).fill(0);
+        console.log('外注時費用列が見つからないため、0に設定');
+    }
+    
+    // 収益貢献（年）を(月工数×500000/150)×12で算出
+    let annualRevenues = [];
+    if (firstRow.hasOwnProperty('月工数（h）')) {
+        annualRevenues = filteredResults.map(row => {
+            const monthlyHours = parseFloat(row['月工数（h）']) || 0;
+            // 月工数×500000/150×12ヶ月で年間収益貢献を算出
+            return Math.round(monthlyHours * 500000 / 150) * 12;
+        });
+        console.log('収益貢献（年）を算出しました（月工数×500000/150×12）');
+    } else {
+        annualRevenues = new Array(filteredResults.length).fill(0);
+        console.log('月工数（h）列が見つからないため、収益貢献（年）は0に設定');
+    }
+    
+    // インターン費用と収益貢献（年）を追加
+    newData.forEach((row, index) => {
+        row['インターン費用'] = internCosts[index];
+        row['収益貢献（年）'] = annualRevenues[index];
+    });
+    
+    // 項番で昇順ソート
+    if (newData[0] && newData[0].hasOwnProperty('項番') && newData[0]['項番']) {
+        newData.sort((a, b) => {
+            const aNum = parseInt(String(a['項番']).match(/\d+/)?.[0] || '0');
+            const bNum = parseInt(String(b['項番']).match(/\d+/)?.[0] || '0');
+            return aNum - bNum;
+        });
+        console.log('項番でソートしました');
+    }
+    
+    // 列の順序を指定
+    const columnOrder = ['項番', '依頼部署', '開発分類', 'タスク内容', '進捗状況', 'インターン費用', '外注時費用', '収益貢献（年）'];
+    
+    // 順序に従ってデータを整理
+    const orderedData = newData.map(row => {
+        const orderedRow = {};
+        columnOrder.forEach(col => {
+            orderedRow[col] = row[col] || '';
+        });
+        return orderedRow;
+    });
+    
+    taskProcessedData = orderedData;
+    
+    console.log(`\n=== タスク管理データ処理完了 ===`);
+    console.log(`最終データ件数: ${taskProcessedData.length} 件`);
+    console.log(`出力列数: ${columnOrder.length} 列`);
+    console.log('出力列順:', columnOrder);
+    
+    // 統計情報の計算
+    const statistics = calculateTaskStatistics(taskProcessedData);
+    console.log('\n=== 統計情報 ===');
+    console.log(`総インターン費用: ${statistics.totalInternCost.toLocaleString()} 円`);
+    console.log(`総外注費用: ${statistics.totalOutsourcingCost.toLocaleString()} 円`);
+    console.log(`総収益貢献: ${statistics.totalAnnualRevenue.toLocaleString()} 円`);
+    console.log(`費用対効果: ${statistics.costEffectiveness.toFixed(2)}`);
+}
+
+// タスク統計情報を計算
+function calculateTaskStatistics(data) {
+    const totalInternCost = data.reduce((sum, row) => sum + (parseFloat(row['インターン費用']) || 0), 0);
+    const totalOutsourcingCost = data.reduce((sum, row) => sum + (parseFloat(row['外注時費用']) || 0), 0);
+    const totalAnnualRevenue = data.reduce((sum, row) => sum + (parseFloat(row['収益貢献（年）']) || 0), 0);
+    const totalCost = totalInternCost + totalOutsourcingCost;
+    const costEffectiveness = totalCost > 0 ? totalAnnualRevenue / totalCost : 0;
+    
+    return {
+        totalInternCost,
+        totalOutsourcingCost,
+        totalAnnualRevenue,
+        totalCost,
+        costEffectiveness
+    };
 }
 
 // インターン生管理の結果表示
@@ -1418,12 +1902,18 @@ function downloadTaskCSV() {
         const csvContent = convertToCSV(taskProcessedData);
         const filename = `タスク管理データ_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
         downloadCSV(csvContent, filename);
+        
+        console.log('タスクCSVダウンロード完了:', filename);
+        console.log('出力データ件数:', taskProcessedData.length);
+        console.log('出力列:', Object.keys(taskProcessedData[0] || {}));
+        
     } catch (error) {
         console.error('タスクCSVダウンロードエラー:', error);
         showError('CSVファイルの作成中にエラーが発生しました: ' + error.message);
     }
 }
 
+// タスク管理のPowerPoint出力（ページネーション対応）
 function downloadTaskPowerPoint() {
     if (!taskProcessedData.length) {
         showError('タスクデータがありません。');
@@ -1445,70 +1935,190 @@ function downloadTaskPowerPoint() {
         pptx.title = 'タスク管理レポート';
         pptx.subject = 'タスクの進捗状況分析';
         
-        createTaskTitleSlide(pptx);
-        createTaskSummarySlide(pptx);
+        // フィルタリング済みデータを使用（現在ブラウザに表示されているデータ）
+        // filteredData2が空の場合はtaskProcessedDataを使用
+        const dataToExport = (filteredData2 && filteredData2.length > 0) ? filteredData2 : taskProcessedData;
+        const totalPages = Math.ceil(dataToExport.length / itemsPerPage);
+        
+        console.log(`PowerPoint生成開始: ${dataToExport.length}件のデータを${totalPages}ページに分割`);
+        
+        // サマリースライドを作成
+        createTaskSummarySlideForPPT(pptx, dataToExport);
+        
+        // データを20件ずつに分けてスライド作成
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+            const startIndex = (pageNum - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, dataToExport.length);
+            const pageData = dataToExport.slice(startIndex, endIndex);
+            
+            console.log(`スライド${pageNum + 1}を作成中: ${startIndex + 1}〜${endIndex}件目（${pageData.length}件）`);
+            
+            createTaskDataSlide(pptx, pageData, pageNum, totalPages, startIndex + 1, endIndex);
+        }
         
         const filename = `タスク管理レポート_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pptx`;
         pptx.writeFile({ fileName: filename }).then(() => {
-            console.log('タスクPowerPointダウンロード完了');
+            console.log(`PowerPoint出力完了: ${filename}`);
+            console.log(`総スライド数: ${totalPages + 1}枚（サマリー1枚 + データ${totalPages}枚）`);
             hideLoading();
         }).catch(error => {
-            console.error('タスクPowerPoint保存エラー:', error);
+            console.error('PowerPoint保存エラー:', error);
             hideLoading();
             showError('PowerPointファイルの保存に失敗しました: ' + error.message);
         });
         
     } catch (error) {
-        console.error('タスクPowerPoint生成エラー:', error);
+        console.error('PowerPoint生成エラー:', error);
         hideLoading();
         showError('PowerPointファイルの生成に失敗しました: ' + error.message);
     }
 }
 
-function createTaskTitleSlide(pptx) {
+// タスク管理サマリースライド作成
+function createTaskSummarySlideForPPT(pptx, data) {
     const slide = pptx.addSlide();
     
-    slide.addText('タスク管理レポート', {
-        x: 1, y: 2, w: 8, h: 1.5,
-        fontSize: 36, bold: true, align: 'center',
-        color: '2F4F4F'
-    });
-    
-    slide.addText(`作成日時: ${new Date().toLocaleString('ja-JP')}`, {
-        x: 1, y: 4, w: 8, h: 0.5,
-        fontSize: 16, align: 'center',
-        color: '666666'
-    });
-    
-    slide.addText([
-        { text: '概要\n', options: { fontSize: 20, bold: true, color: '2F4F4F' } },
-        { text: `・総タスク数: ${taskRawData.length}件\n`, options: { fontSize: 16 } },
-        { text: `・処理済みタスク数: ${taskProcessedData.length}件\n`, options: { fontSize: 16 } },
-        { text: `・除外タスク数: ${taskRawData.length - taskProcessedData.length}件`, options: { fontSize: 16 } }
-    ], {
-        x: 1, y: 5, w: 8, h: 2,
-        align: 'left'
-    });
-}
-
-function createTaskSummarySlide(pptx) {
-    const slide = pptx.addSlide();
-    
-    slide.addText('進捗状況分類結果', {
+    // スライドタイトル
+    slide.addText('タスク管理レポート - サマリー', {
         x: 0.5, y: 0.3, w: 9, h: 0.7,
         fontSize: 24, bold: true, align: 'center',
         color: '2F4F4F'
     });
     
-    const summaryData = Object.entries(taskClassificationData).map(([status, count]) => [status, count.toString()]);
+    // 作成日時
+    slide.addText(`作成日時: ${new Date().toLocaleString('ja-JP')}`, {
+        x: 0.5, y: 1.0, w: 9, h: 0.4,
+        fontSize: 12, align: 'center',
+        color: '666666'
+    });
     
-    slide.addTable([['進捗状況', '件数'], ...summaryData], {
-        x: 2, y: 2, w: 6, h: 4,
-        colW: [4, 2],
-        border: { pt: 1, color: 'CCCCCC' },
-        fill: { color: 'F9F9F9' },
-        rowH: 0.5,
-        fontSize: 14
+    // 統計情報
+    const statistics = calculateTaskStatistics(data);
+    const totalRaw = taskRawData.length;
+    const totalProcessed = data.length;
+    const excludedCount = totalRaw - totalProcessed;
+    
+    const summaryText = [
+        { text: '処理統計\n', options: { fontSize: 18, bold: true, color: '2F4F4F' } },
+        { text: `・総タスク数: ${totalRaw}件\n`, options: { fontSize: 14 } },
+        { text: `・処理済みタスク数: ${totalProcessed}件\n`, options: { fontSize: 14 } },
+        { text: `・除外タスク数: ${excludedCount}件\n`, options: { fontSize: 14 } },
+        { text: `・処理率: ${((totalProcessed / totalRaw) * 100).toFixed(1)}%\n\n`, options: { fontSize: 14 } },
+        
+        { text: '費用・収益統計\n', options: { fontSize: 18, bold: true, color: '2F4F4F' } },
+        { text: `・総インターン費用: ${(statistics.totalInternCost / 10000).toFixed(0)}万円\n`, options: { fontSize: 14 } },
+        { text: `・総外注費用: ${(statistics.totalOutsourcingCost / 10000).toFixed(0)}万円\n`, options: { fontSize: 14 } },
+        { text: `・年間収益貢献: ${(statistics.totalAnnualRevenue / 10000).toFixed(0)}万円\n`, options: { fontSize: 14 } },
+        { text: `・費用対効果: ${statistics.costEffectiveness.toFixed(1)}倍`, options: { fontSize: 14 } }
+    ];
+    
+    slide.addText(summaryText, {
+        x: 1, y: 1.8, w: 8, h: 4,
+        align: 'left'
+    });
+    
+    // 進捗分類統計
+    const classificationText = [
+        { text: '進捗状況分類\n', options: { fontSize: 18, bold: true, color: '2F4F4F' } }
+    ];
+    
+    Object.entries(taskClassificationData).forEach(([status, count]) => {
+        const percentage = totalProcessed > 0 ? ((count / totalProcessed) * 100).toFixed(1) : 0;
+        classificationText.push({
+            text: `・${status}: ${count}件 (${percentage}%)\n`,
+            options: { fontSize: 14 }
+        });
+    });
+    
+    slide.addText(classificationText, {
+        x: 1, y: 5.5, w: 8, h: 2,
+        align: 'left'
+    });
+}
+
+// タスクデータスライド作成
+function createTaskDataSlide(pptx, pageData, pageNum, totalPages, startNum, endNum) {
+    const slide = pptx.addSlide();
+    
+    // スライドタイトル
+    slide.addText(`タスク一覧 - ${pageNum}/${totalPages}ページ (${startNum}〜${endNum}件目)`, {
+        x: 0.3, y: 0.2, w: 9.4, h: 0.5,
+        fontSize: 16, bold: true, align: 'center',
+        color: '2F4F4F'
+    });
+    
+    // テーブルデータの準備
+    const headers = Object.keys(pageData[0] || {});
+    const tableData = [headers]; // ヘッダー行
+    
+    // データ行を追加
+    pageData.forEach(row => {
+        const rowData = headers.map(header => {
+            let value = row[header] || '';
+            
+            // 金額項目の表示形式調整
+            if (header === 'インターン費用' || header === '外注時費用' || header === '収益貢献（年）') {
+                const numValue = parseFloat(value);
+                if (numValue > 0) {
+                    value = numValue.toLocaleString(); // カンマ区切りで表示
+                } else {
+                    value = '0';
+                }
+            }
+            
+            // 長いテキストの切り詰め
+            if (typeof value === 'string' && value.length > 30) {
+                value = value.substring(0, 27) + '...';
+            }
+            
+            return value.toString();
+        });
+        tableData.push(rowData);
+    });
+    
+    // 列幅の動的計算
+    const totalWidth = 9.4;
+    const colCount = headers.length;
+    const baseWidth = totalWidth / colCount;
+    
+    // 列ごとの幅調整
+    const colWidths = headers.map(header => {
+        switch (header) {
+            case '項番': return baseWidth * 0.6;
+            case '依頼部署': return baseWidth * 1.0;
+            case '開発分類': return baseWidth * 1.2;
+            case 'タスク内容': return baseWidth * 2.0;
+            case '進捗状況': return baseWidth * 1.0;
+            case 'インターン費用': return baseWidth * 1.0;
+            case '外注時費用': return baseWidth * 1.0;
+            case '収益貢献（年）': return baseWidth * 1.2;
+            default: return baseWidth;
+        }
+    });
+    
+    // テーブルをスライドに追加
+    slide.addTable(tableData, {
+        x: 0.3, y: 0.8, w: totalWidth, h: 6.5,
+        fontSize: 10,
+        colW: colWidths,
+        border: { type: 'solid', color: 'CCCCCC', pt: 1 },
+        fill: { color: 'FFFFFF' },
+        headerRow: { 
+            fill: { color: 'F2F2F2' }, 
+            bold: true,
+            fontSize: 11,
+            color: '2F4F4F'
+        },
+        align: 'center',
+        valign: 'middle'
+    });
+    
+    // ページ情報をフッターに追加
+    const totalDisplayed = (filteredData2 && filteredData2.length > 0) ? filteredData2.length : taskProcessedData.length;
+    slide.addText(`${pageData.length}件表示 | 全${totalDisplayed}件中`, {
+        x: 0.3, y: 7.4, w: 9.4, h: 0.3,
+        fontSize: 10, align: 'right',
+        color: '999999'
     });
 }
 
@@ -1721,4 +2331,25 @@ function addMemberProfile(slide, member, x, y, width, height, imageSize, textMar
         align: 'left',
         valign: 'top'
     });
+}
+
+// タスク管理のサマリー更新
+function updateTaskManagementSummary() {
+    const totalTasksElement = document.getElementById('totalTasks2');
+    const processedTasksElement = document.getElementById('processedTasks2');
+    const excludedTasksElement = document.getElementById('excludedTasks2');
+    
+    const totalTasks = taskRawData.length;
+    const processedTasks = taskProcessedData.length;
+    const excludedTasks = totalTasks - processedTasks;
+    
+    if (totalTasksElement) {
+        totalTasksElement.textContent = totalTasks;
+    }
+    if (processedTasksElement) {
+        processedTasksElement.textContent = processedTasks;
+    }
+    if (excludedTasksElement) {
+        excludedTasksElement.textContent = excludedTasks;
+    }
 } 
